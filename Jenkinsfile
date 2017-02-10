@@ -23,9 +23,9 @@ timeout(time: 30, unit: 'MINUTES'){
       ])
     }
 
-    stage('Build BIE') {
+    stage('Build Maven External Plugin') {
       try {
-        sh 'mvn clean deploy  -DskipTests -Dquality.check.skip=true'
+        sh 'mvn clean deploy -DskipTests -Dquality.check.skip=true'
         currentBuild.result = 'SUCCESS'
       }
       catch(e) {
