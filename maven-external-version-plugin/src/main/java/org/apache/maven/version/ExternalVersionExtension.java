@@ -93,6 +93,7 @@ public class ExternalVersionExtension
     
     private List<String> artifactsToExclude = new ArrayList<String>();
 
+    private boolean skipPropertyReplace = false;
     @Override
     public void afterProjectsRead( MavenSession session )
         throws MavenExecutionException
@@ -100,7 +101,12 @@ public class ExternalVersionExtension
         logger.info( "About to change project version in reactor." );
 
         Map<String, String> gavVersionMap = new HashMap<String, String>();
-
+        if ( session.getUserProperties().containsKey( "external-version.skipPropertyReplace" ) )
+        {
+            skipPropertyReplace = Boolean.valueOf( 
+                session.getUserProperties().get( "external-version.skipPropertyReplace" ).toString() );
+        }
+        
         for ( MavenProject mavenProject : session.getAllProjects() )
         {
             if ( !artifactsToExclude.contains( mavenProject.getArtifactId() ) )
@@ -366,13 +372,17 @@ public class ExternalVersionExtension
     private List<String> listOfPropertiesToChange( Xpp3Dom pluginConfiguration )
     {
         List<String> propertyNames = new ArrayList<String>();
-        Xpp3Dom values = pluginConfiguration.getChild( "propertiesToReplace" );
-        Xpp3Dom property[] = values.getChildren();        
-        if ( null != property && property.length > 0 )
+        boolean skip = skipPropertyReplace || shouldSkipPropertyReplace( pluginConfiguration );
+        if ( !skip )
         {
-            for ( Xpp3Dom xpp3Dom : property ) 
+            Xpp3Dom values = pluginConfiguration.getChild( "propertiesToReplace" );
+            Xpp3Dom property[] = values.getChildren();        
+            if ( null != property && property.length > 0 )
             {
-                propertyNames.add( xpp3Dom.getValue() );
+                for ( Xpp3Dom xpp3Dom : property ) 
+                {
+                    propertyNames.add( xpp3Dom.getValue() );
+                }
             }
         }
         return propertyNames;
@@ -426,6 +436,14 @@ public class ExternalVersionExtension
         return evaluateBooleanNodeInConfiguration( pluginConfiguration, "generateTemporaryFile" );
     }
 
+    /*
+     * Looks for generateTemporaryFile child configuration node.
+     * If not present then no deletion occurs, otherwise return true if value is true, false otherwise
+     */
+    private boolean shouldSkipPropertyReplace( Xpp3Dom pluginConfiguration ) 
+    {
+        return evaluateBooleanNodeInConfiguration( pluginConfiguration, "skipPropertyReplace" );
+    }
     /*
      * Looks for deleteTemporaryFile child configuration node.
      * If not present then no deletion occurs, otherwise return true if value is true, false otherwise

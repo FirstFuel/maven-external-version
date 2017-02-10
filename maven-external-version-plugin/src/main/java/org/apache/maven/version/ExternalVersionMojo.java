@@ -55,6 +55,9 @@ public class ExternalVersionMojo
     @Parameter( property = "external-version.artifactIdToExclude" , defaultValue = "" )
     private String artifactIdToExclude;
     
+    @Parameter( property = "external-version.skipPropertyReplace" , defaultValue = "false" )
+    private boolean skipPropertyReplace;
+    
     @Override
     public void execute()
         throws MojoExecutionException, MojoFailureException
