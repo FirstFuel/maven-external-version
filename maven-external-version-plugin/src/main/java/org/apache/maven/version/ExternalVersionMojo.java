@@ -52,11 +52,18 @@ public class ExternalVersionMojo
     @Parameter( property = "external-version.propertiesToReplace" , defaultValue = "" )
     private String propertiesToReplace;
 
+    @Parameter( property = "external-version.parentProperties" , defaultValue = "" )
+    private String parentProperties;
+    
     @Parameter( property = "external-version.artifactIdToExclude" , defaultValue = "" )
     private String artifactIdToExclude;
     
-    @Parameter( property = "external-version.skipPropertyReplace" , defaultValue = "false" )
-    private boolean skipPropertyReplace;
+    @Parameter( property = "external-version.hasParentRepo" , defaultValue = "true" )
+    private boolean hasParentRepo;
+
+    @Parameter( property = "external-version.parentArtifacts" , defaultValue = "" )
+    private String parentArtifacts;
+
     
     @Override
     public void execute()

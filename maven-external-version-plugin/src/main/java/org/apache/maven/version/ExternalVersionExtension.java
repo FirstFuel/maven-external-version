@@ -92,8 +92,9 @@ public class ExternalVersionExtension
     private PlexusContainer container;
     
     private List<String> artifactsToExclude = new ArrayList<String>();
+    private List<String> parentArtifactsToExclude = new ArrayList<String>();
 
-    private boolean skipPropertyReplace = false;
+    private boolean hasParentRepo = true;
     @Override
     public void afterProjectsRead( MavenSession session )
         throws MavenExecutionException
@@ -101,15 +102,15 @@ public class ExternalVersionExtension
         logger.info( "About to change project version in reactor." );
 
         Map<String, String> gavVersionMap = new HashMap<String, String>();
-        if ( session.getUserProperties().containsKey( "external-version.skipPropertyReplace" ) )
+        if ( session.getUserProperties().containsKey( "external-version.hasParentRepo" ) )
         {
-            skipPropertyReplace = Boolean.valueOf( 
-                session.getUserProperties().get( "external-version.skipPropertyReplace" ).toString() );
+            hasParentRepo = Boolean.valueOf( 
+                session.getUserProperties().get( "external-version.hasParentRepo" ).toString() );
         }
         
         for ( MavenProject mavenProject : session.getAllProjects() )
         {
-            if ( !artifactsToExclude.contains( mavenProject.getArtifactId() ) )
+            if ( !artifactsToExclude.contains( buildArtifactKey( mavenProject ) ) )
             {
                 // Lookup this plugin's configuration
                 Plugin plugin = mavenProject.getPlugin( "org.apache.maven.plugins:maven-external-version-plugin" );
@@ -119,6 +120,10 @@ public class ExternalVersionExtension
                 Xpp3Dom configDom = (Xpp3Dom) plugin.getConfiguration();
     
                 artifactsToExclude = listOfArtifactsToExclude( configDom );
+                parentArtifactsToExclude = listOfPParentArtifacts( configDom );
+                
+                logger.info( "artifactsToExclude   " + artifactsToExclude );
+                logger.info( "parentArtifactsToExclude   " + parentArtifactsToExclude );
 
                     
                 ExternalVersionStrategy strategy = getStrategy( configDom, mavenProject.getFile() );
@@ -170,7 +175,7 @@ public class ExternalVersionExtension
 
         for ( MavenProject mavenProject : session.getAllProjects() )
         {
-            if ( ! artifactsToExclude.contains( mavenProject.getArtifactId() ) )
+            if ( ! artifactsToExclude.contains( buildArtifactKey( mavenProject ) ) )
             {
                 try
                 {
@@ -213,11 +218,18 @@ public class ExternalVersionExtension
             for ( Dependency dependency : dependencies ) 
             {
                 String buildGavKey = buildGavKey( dependency );
+                String artifactKey = buildArtifactKey(  dependency );
                 if ( !gavVersionMap.containsKey( buildGavKey  ) 
-                    && ! artifactsToExclude.contains( dependency.getArtifactId() )
+                    && ! artifactsToExclude.contains( artifactKey )
+                    && ! parentArtifactsToExclude.contains( artifactKey )
                     && dependency.getVersion().equalsIgnoreCase( oldVersion ) )
                 {
                     gavVersionMap.put( buildGavKey, newVersion );
+                } 
+                else if ( artifactsToExclude.contains( artifactKey ) 
+                    || parentArtifactsToExclude.contains( artifactKey ) )
+                {
+                    logger.info( "updateDependencyArtifacts Dependency will not be updated " + artifactKey );
                 }
             }
         }
@@ -242,10 +254,24 @@ public class ExternalVersionExtension
                         {
                             for ( int i = 0; i < artifactItems.getChildCount(); i++ ) 
                             {
-                                if ( artifactItems.getChild( i ).getChild( "version" ).
+                                Xpp3Dom artifactItem = artifactItems.getChild( i );
+                                
+                                String artifactKey = buildArtifactKey( artifactItem.getChild( "groupId" ).getValue(), 
+                                    artifactItem.getChild( "artifactId" ).getValue() );
+                                
+                                if ( ! parentArtifactsToExclude.contains( artifactKey ) 
+                                    || artifactItem.getChild( "version" ).
                                     getValue().equalsIgnoreCase( oldVersion ) )
                                 {
-                                    artifactItems.getChild( i ).getChild( "version" ).setValue( newVersion );
+                                    artifactItem.getChild( "version" ).setValue( newVersion );
+                                } 
+                                else
+                                {
+                                    if ( parentArtifactsToExclude.contains( artifactKey ) )
+                                    {
+                                        logger.info( "updateDependencyPlugin Dependency will not be updated "
+                                            + artifactKey );
+                                    }
                                 }
                             }
                         }
@@ -305,6 +331,21 @@ public class ExternalVersionExtension
             oldVersion ).toString();
     }
 
+    private String buildArtifactKey( String groupId, String artifactId )
+    {
+        return new StringBuilder( groupId ).append( ":" ).append( artifactId ).toString();
+    }
+    
+    private String buildArtifactKey( Dependency dependency )
+    {
+        return buildArtifactKey( dependency.getGroupId(), dependency.getArtifactId() );
+    }
+    
+    private String buildArtifactKey( MavenProject mavenProject )
+    {
+        return buildArtifactKey( mavenProject.getGroupId(), mavenProject.getArtifactId() );
+    }
+    
     private void createNewVersionPom( MavenProject mavenProject, Map<String, String> gavVersionMap )
         throws IOException, XmlPullParserException
     {
@@ -318,7 +359,8 @@ public class ExternalVersionExtension
 
 
             // TODO: this needs to be restructured when other references are updated (dependencies, dep-management, plugins, etc)
-            if ( model.getParent() != null && ! artifactsToExclude.contains( model.getParent().getArtifactId() ) )
+            if ( model.getParent() != null && ! artifactsToExclude.contains( 
+                buildArtifactKey( model.getParent().getGroupId(), model.getParent().getArtifactId() ) ) )
             {
                  model.getParent().setVersion( mavenProject.getVersion() );
             }
@@ -327,6 +369,12 @@ public class ExternalVersionExtension
             // now we are going to wedge in the config
             Xpp3Dom pluginConfiguration = (Xpp3Dom) plugin.getConfiguration();
             List<String> propertiesToUpdate = listOfPropertiesToChange( pluginConfiguration ) ;
+            List<String> parentProperties = listOfParentPropertiese( pluginConfiguration ) ;
+            
+            for ( String string : parentProperties ) 
+            {
+                propertiesToUpdate.remove( string );
+            }
             Properties properties =  model.getProperties();
             
             Enumeration<?> e = properties.propertyNames();
@@ -352,7 +400,9 @@ public class ExternalVersionExtension
             for ( Dependency dependency : dependencies ) 
             {
                 String buildGavKey = buildGavKey( dependency );
-                if ( gavVersionMap.containsKey( buildGavKey  ) )
+                String buildArtifactKey = buildArtifactKey(  dependency );
+                if ( ! parentArtifactsToExclude.contains( buildArtifactKey ) 
+                    && gavVersionMap.containsKey( buildGavKey  ) )
                 {
                     dependency.setVersion( gavVersionMap.get( buildGavKey ) );
                 }
@@ -372,10 +422,44 @@ public class ExternalVersionExtension
     private List<String> listOfPropertiesToChange( Xpp3Dom pluginConfiguration )
     {
         List<String> propertyNames = new ArrayList<String>();
-        boolean skip = skipPropertyReplace || shouldSkipPropertyReplace( pluginConfiguration );
-        if ( !skip )
+        Xpp3Dom values = pluginConfiguration.getChild( "propertiesToReplace" );
+        Xpp3Dom property[] = values.getChildren();        
+        if ( null != property && property.length > 0 )
         {
-            Xpp3Dom values = pluginConfiguration.getChild( "propertiesToReplace" );
+            for ( Xpp3Dom xpp3Dom : property ) 
+            {
+                propertyNames.add( xpp3Dom.getValue() );
+            }
+        }
+        return propertyNames;
+    }
+    
+    private List<String> listOfParentPropertiese( Xpp3Dom pluginConfiguration )
+    {
+        List<String> propertyNames = new ArrayList<String>();
+        if ( ! ( hasParentRepo || hasParentRepoValue( pluginConfiguration ) ) )
+        {
+            Xpp3Dom values = pluginConfiguration.getChild( "parentProperties" );
+            Xpp3Dom property[] = values.getChildren();        
+            if ( null != property && property.length > 0 )
+            {
+                for ( Xpp3Dom xpp3Dom : property ) 
+                {
+                    propertyNames.add( xpp3Dom.getValue() );
+                }
+            }
+        }
+        return propertyNames;
+    }
+    
+    
+    
+    private List<String> listOfPParentArtifacts( Xpp3Dom pluginConfiguration )
+    {
+        List<String> propertyNames = new ArrayList<String>();
+        if ( ! (  hasParentRepo || hasParentRepoValue( pluginConfiguration ) )  )
+        {
+            Xpp3Dom values = pluginConfiguration.getChild( "parentArtifacts" );
             Xpp3Dom property[] = values.getChildren();        
             if ( null != property && property.length > 0 )
             {
@@ -440,9 +524,9 @@ public class ExternalVersionExtension
      * Looks for generateTemporaryFile child configuration node.
      * If not present then no deletion occurs, otherwise return true if value is true, false otherwise
      */
-    private boolean shouldSkipPropertyReplace( Xpp3Dom pluginConfiguration ) 
+    private boolean hasParentRepoValue( Xpp3Dom pluginConfiguration ) 
     {
-        return evaluateBooleanNodeInConfiguration( pluginConfiguration, "skipPropertyReplace" );
+        return evaluateBooleanNodeInConfiguration( pluginConfiguration, "hasParentRepo" );
     }
     /*
      * Looks for deleteTemporaryFile child configuration node.
