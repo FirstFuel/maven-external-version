@@ -1,0 +1,11 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.19.0  # do not change version, see here for details: https://tendrilinc.slack.com/archives/C02JFTB4550/p1700083772441639?thread_ts=1699577140.305169&cid=C02JFTB4550
+# ignores vulnerabilities until expiry date; change duration by modifying expiry date
+ignore:
+  SNYK-JAVA-ORGCODEHAUSPLEXUS-31522:
+    - '*':
+        reason: 'Unreachable paths.'
+        expires: 2024-07-05T23:59:59Z
+        created: 2024-06-05T11:00:002Z
+
+patch: {}
