@@ -13,8 +13,8 @@ metadata:
     uplightinc.atlassian.net/slo: N/A
     uplightinc.atlassian.net/sla: N/A
     snyk.io/org-id: N/A
-    pagerduty.com/service-id: N/A
-    uplightinc.atlassian.net/incident-management: N/A
+    pagerduty.com/service-id: PVRVZ8J
+    uplightinc.atlassian.net/incident-management: https://uplightinc.atlassian.net/wiki/spaces/DOC/pages/7665680385/FirstFuel+-+Incident+Management
     backstage.io/techdocs-ref: dir:docs/runbooks
   labels:
     tier: backend
