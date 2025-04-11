@@ -22,4 +22,4 @@ metadata:
 spec:
   owner: group:FirstFuel/rainforest
   type: library
-  lifecycle: development
+  lifecycle: experimental
