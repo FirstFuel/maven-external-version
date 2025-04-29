@@ -5,7 +5,7 @@ ignore:
   SNYK-JAVA-ORGCODEHAUSPLEXUS-31522:
     - '*':
         reason: 'Unreachable paths.'
-        expires: 2024-12-05T23:59:59Z
+        expires: 2025-10-05T23:59:59Z
         created: 2024-09-06T11:00:002Z
 
 patch: {}
