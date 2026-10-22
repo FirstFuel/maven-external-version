@@ -28,6 +28,8 @@
         <version>0.1.9</version>
     </parent>
 
+
+
     <groupId>org.apache.maven.plugins</groupId>
     <artifactId>maven-external-version-plugin</artifactId>
     <version>${parent.version}</version>
